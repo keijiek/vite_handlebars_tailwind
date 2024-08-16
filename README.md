@@ -60,12 +60,14 @@ bun add -D vite vite-plugin-handlebars glob tailwindcss autoprefixer postcss
 
 ```json
 {
-+ "type": "module",
-+ "scripts": {
-+   "dev": "vite",
-+   "build": "vite build",
-+   "preview": "vite preview"
-+ },
+  // ここから
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  // ここまで
   "dependencies": {},
   "devDependencies": {
     "autoprefixer": "^10.4.20",
