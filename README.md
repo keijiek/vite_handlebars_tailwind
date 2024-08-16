@@ -184,7 +184,7 @@ function entryPoints() {
 次のコマンドを実行。
 
 ```bash
-mkdir -p src/{js,css,imgs,components}
+mkdir -p src/{js,css,imgs,components,public}
 touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html,footer.html}}
 ```
 
@@ -196,6 +196,7 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 ├── src/
 │   ├── second.html
 │   ├── imgs/
+│   ├── public/
 │   ├── js/
 │   │   └── main.js
 │   ├── css/
@@ -212,7 +213,47 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 └── vite.config.js
 ```
 
-## index.html
+### ディレクトリの説明
+
+- imgs : 画像ファイルを入れる。ただし、html 等から読み込まれていなければビルドされない(distに出力されない)。
+- public : ここに置かれたファイルやディレクトリは、ビルド時、同じ構造のまま dist 直下に出力される。
+
+### src/css/style.css
+
+ビルド時に tailwindcss が出力されるように次を記述。
+
+main.js から import することでビルドの依存関係に巻き込むので、
+html ファイルから link タグでこのcssを読み込む必要はない。
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+### src/js/main.js
+
+css を import して、ビルドに巻き込む。
+他にも必要な外部ファイルはどんどん import する。
+
+window.addEventListener のコールバック関数内に、フロント側で必要な処理を書いていく。
+もちろん、別ファイルに関数を書いてimportし、それを呼び出す方法がおすすめ。
+
+```js
+import '../css/style.css';
+
+window.addEventListener('DOMContentLoaded', function () {
+  // 処理を書く
+});
+```
+
+### index.html
+
+handlebars では、`{{}}`で、context の変数や、外部のhtmlを読み込む。
+
+外部htmlの読み込みは、`{{> ファイルパス}}` と書く。
+
+変数の読み込みは `{{変数名}}` と書く。
 
 ```html
 <!DOCTYPE html>
@@ -231,7 +272,10 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 </html>
 ```
 
-## second.html
+### second.html
+
+second.html のように、任意の html ファイルを作ってよい。
+vite.config.js の rollupOptions.input の設定により、src 内に作った html ファイルは、自動的にエントリーポイントとして追加される。
 
 ```html
 <!DOCTYPE html>
@@ -250,7 +294,14 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 </html>
 ```
 
-## head.html
+### head.html
+
+script タグで、js の起点ファイルとなる main.js を読み込み、ビルドの依存関係に巻き込む。
+ビルド全体のエントリーポイントは、vite.config.js の rollupOptions.inputo に設定された html ファイル群。
+html から読み込まれればビルドに巻き込まれるし、html から読み込まれた js ファイルから import されているファイルもビルドに巻き込まれ、そうやって import された css ファイルから @import されたファイルもビルドに巻き込まれる。
+逆に、上記の巻き込みの連鎖から外れているファイルはビルドされない。
+
+もしも、依存関係に巻き込めていないけどビルドに含めたいファイルがあれば(例えばfavicon)、src/public/ ディレクトリの中に置いておく。
 
 ```html
 <meta charset="UTF-8">
@@ -258,7 +309,7 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 <script type="module" src="./js/main.js"></script>
 ```
 
-## header.html
+### header.html
 
 ```html
 <header>
@@ -272,10 +323,79 @@ touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html
 </header>
 ```
 
-## footer.html
+### footer.html
 
 ```html
 <footer>
   <p>&copy; HogeCorp. 2024</p>
 </footer>
+```
+
+## 開発サーバーを立てて開発
+
+```bash
+bun run dev
+```
+
+コーディングして保存すると、開発サーバーを閲覧するブラウザが自動的に更新される。
+それを見ながらコーディングを進める。
+
+## 本番用のファイルをビルド
+
+```bash
+bun run build
+```
+
+## 本番用のファイルを手元で確認
+
+```bash
+bun run preview
+```
+
+## rsync によるアップロード
+
+upload_script.sh などという何らかの名前で sh ファイルを作り、そこにシェルスクリプトを書く。
+.gitignore で無視しておき、公開リポジトリに git push しないよう注意。
+
+```bash
+touch upload_script.sh
+chmod 700 upload_script.sh
+```
+
+シェルスクリプト。念のため dry-run にしてある。いちど実行し、結果が良好なら外して使う。
+
+```sh
+#!/bin/bash
+
+rsync -avz --dry-run dist/ ~/.ssh/configのHost名:/path/to/webusite/documentroot/
+```
+
+実行
+
+```bash
+upload_script.sh
+```
+
+鍵のパスフレーズを求められるので入力
+
+なお、前提となる ~/.ssh/config の記述は次のような様式。
+
+```bash
+Host any_setting_name # なんでもよい。ssh や rsync から設定を呼び出すときの名前
+  HostName hoge.huga.jp # ホスト名。あるいは ip アドレス。
+  User user_name # サーバーでのユーザー名, 例通りならば接続先に /home/user_name/ ディレクトリがあるということ。
+  Port 22 # ssh ポート番号。規定値は22だが大抵は別の番号が割り当てられる。
+  IdentityFile /path/to/ssh/secret/key # 対応する ssh 秘密鍵のフルパス。接続先の .ssh ディレクトリに対応する公開鍵が登録されているということ。
+  ForwardAgent yes # この接続先から、さらに別のリモートサーバーに ssh 接続する場合は yes
+```
+
+package.json の scripts に次のように書くと、build 後に上記のスクリプトが自動実行されて、ちょっと便利。鍵を ssh-add すればもっと便利に。
+
+```json
+{
+  "scripts": {
+    "build" : "vite build",
+    "postbuild" : "sh upload_script.sh"
+  }
+}
 ```
