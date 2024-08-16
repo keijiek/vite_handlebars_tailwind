@@ -1,6 +1,6 @@
 # vite.js + handlebars + tailwindcss で、複数ページから成る静的ウェブサイトをコーディングする環境
 
-**Astro.js を使う。以上...**  
+**Astro.js を使いましょう...**  
 と言いたいところだけど、何らかの理由でそういうわけにもいかない人向けに。
 
 ## 前提: bun.js
@@ -8,19 +8,19 @@
 **bun.js** を導入済みであること。 
 [公式サイト](https://bun.sh/)を見ればコマンド一行でインストールできる。 
 
-node.js のインストールにはバージョン管理ツールの使用が望ましいので、教えるのが面倒くさい。 
+node.js のインストールにはバージョン管理ツールの使用が望ましいので、伝えるのが面倒くさい。 
 もちろん node.js でも良いので、その場合は適宜コマンドを読み替えてください。
 
 ```bash
-# devDependencies にインストール
+# devDependencies としてパッケージを追加
 bun add -D any_package_name
 npm i -D any_package_name
 
-# Dependencies にインストール(ほぼ使わない)
+# dependencies にとしてパッケージ追加(フロント側で必要なものはバンドルして読み込ませるので、ほぼ使わない)
 bun add any_package_name
 npm i any_package_name
 
-# package.json の通りにパッケージをインストールする
+# package.json の指示どおりにパッケージをインストールする
 bun i
 npm i
 
@@ -29,8 +29,8 @@ bun run dev
 npm run dev
 
 # 直接、コマンドを実行
-npx hoge
-bunx hoge
+npx any_command
+bunx any_command
 
 # bun.js 自らを最新バージョンに
 bun upgrade
@@ -43,7 +43,7 @@ mkdir any_project_name
 cd $_
 ```
 
-## パッケージをインストール
+## パッケージを追加
 
 ```bash
 bun add -D vite vite-plugin-handlebars glob tailwindcss autoprefixer postcss
@@ -137,30 +137,145 @@ touch vite.config.js
 *vite.config.js* を次のように編集
 
 ```js
+import { defineConfig } from 'vite';
+import * as path from 'path';
+import * as glob from 'glob';
+import handlebars from 'vite-plugin-handlebars';
+import context from './handlebarsContext.json';
 
+export default defineConfig({
+  root: path.resolve(__dirname, 'src'),
+  build: {
+    outDir: path.resolve(__dirname, 'dist'),
+    emptyOutDir: true,
+    minify: true,
+    rollupOptions: {
+      input: entryPoints(),
+    }
+  },
+  plugins: [
+    handlebars({
+      partialDirectory: path.resolve(__dirname, 'src/components'),
+      context,
+    }),
+  ],
+});
+
+// rollupOptions.input の値となる。src内の html を glob で収集し、key: filePath の対が並ぶオブジェクトを生成する。
+function entryPoints() {
+  const entryPoints = glob.sync(path.resolve(__dirname, 'src/**/*.html'), {
+    ignore: path.resolve(__dirname, 'src/components/**/*.html')
+  }).reduce((array, file) => {
+    const { dir, name } = path.parse(file);
+    const key = path.join(dir.replace(path.resolve(__dirname, 'src'), ''), name);
+    array[key] = file;
+    return array;
+  }, {});
+  console.log(entryPoints);
+  return entryPoints;
+}
 ```
+
+- handlebars() の context は外部ファイル化している。vite.config.js 内に書き込んでしまうと、ビルド時にしか参照できない。外部ファイル化しておけば、ビルド時の他、とりわけフロント側で動く js ファイルからも参照できるようになる。
 
 
 ## フォルダやファイルを作る
 
-unix 系なら次のコマンドを実行。
+次のコマンドを実行。
 
 ```bash
 mkdir -p src/{js,css,imgs,components}
-touch src/{index.html,js/main.js,css/style.css}
+touch src/{index.html,js/main.js,css/style.css,components/{head.html,header.html,footer.html}}
 ```
 
-手動でもよいので次の様にする。
+手動でもよいので次の様にファイルとフォルダを作る。
 
 ```bash
 .
 ├── package.json
-└── src/
-    ├── components/
-    ├── css/
-    │   └── style.css
-    ├── imgs/
-    ├── index.html
-    └── js/
-        └── main.js
+├── src/
+│   ├── second.html
+│   ├── imgs/
+│   ├── js/
+│   │   └── main.js
+│   ├── css/
+│   │   └── style.css
+│   ├── index.html
+│   └── components/
+│       ├── footer.html
+│       ├── header.html
+│       └── head.html
+├── handlebarsContext.json
+├── README.md
+├── tailwind.config.js
+├── postcss.config.js
+└── vite.config.js
+```
+
+## index.html
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  {{> head }}
+  <title>{{title}}</title>
+</head>
+<body>
+  {{> header }}
+  <main>
+    <h2>index</h2>
+  </main>
+  {{> footer}}
+</body>
+</html>
+```
+
+## second.html
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  {{> head }}
+  <title>Second | {{title}}</title>
+</head>
+<body>
+  {{> header }}
+  <main>
+    <h2>second</h2>
+  </main>
+  {{> footer}}
+</body>
+</html>
+```
+
+## head.html
+
+```html
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="module" src="./js/main.js"></script>
+```
+
+## header.html
+
+```html
+<header>
+  <h1>{{title}}</h1>
+  <nav>
+    <ul class="flex flex-row gap-4 [&_a]:text-blue-500">
+      <li><a href="/">index</a></li>
+      <li><a href="/second.html">second</a></li>
+    </ul>
+  </nav>
+</header>
+```
+
+## footer.html
+
+```html
+<footer>
+  <p>&copy; HogeCorp. 2024</p>
+</footer>
 ```

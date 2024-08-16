@@ -21,7 +21,6 @@ export default defineConfig({
       context,
     }),
   ],
-
 });
 
 function entryPoints() {
@@ -29,7 +28,7 @@ function entryPoints() {
     ignore: path.resolve(__dirname, 'src/components/**/*.html')
   }).reduce((array, file) => {
     const { dir, name } = path.parse(file);
-    const key = path.join(dir.replace(path.resolve(__dirname, 'src'), ''), name);
+    const key = path.join(dir.replace(path.resolve(__dirname, 'src'), 'test'), name);
     array[key] = file;
     return array;
   }, {});
